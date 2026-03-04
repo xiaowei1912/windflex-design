@@ -13,7 +13,7 @@
 │     - Docker 和依赖安装                                      │
 │     - 电源驱动安装（如需要）                                 │
 │     - 一键部署脚本                                           │
-│     Git Repo: github.com/yourorg/windflex-deploy            │
+│     Git Repo: github.com/xiaowei1912/windflex-deploy            │
 └─────────────────────────────────────────────────────────────┘
                             ↓ 部署
 ┌─────────────────────────────────────────────────────────────┐
@@ -23,7 +23,7 @@
 │     - Hardware Service 代码                                   │
 │     - OpenCLaw (AI Gateway) 代码                              │
 │     - Jenkins 配置（Jenkinsfile）                            │
-│     Git Repo: github.com/yourorg/windflex-system            │
+│     Git Repo: github.com/xiaowei1912/windflex-system            │
 └─────────────────────────────────────────────────────────────┘
                             ↓ 加载测试用例
 ┌─────────────────────────────────────────────────────────────┐
@@ -31,38 +31,13 @@
 │     - Robot Framework 测试用例 (.robot 文件)                  │
 │     - 测试数据和配置文件                                     │
 │     - 测试报告和日志                                         │
-│     Git Repo: github.com/yourorg/board-test-cases           │
+│     Git Repo: github.com/xiaowei1912/board-test-cases           │
 │                                                              │
 │     贡献者：                                                 │
 │     - 用户提交 MR/PR                                         │
 │     - LLM 自动生成并提交 MR/PR                               │
 │     - Jenkins 自动拉取并执行                                 │
 └─────────────────────────────────────────────────────────────┘
-```
-
-### 1.3 硬件环境
-```
-┌─────────────────┐
-│  Ubuntu Server  │
-│                 │
-│  - Jenkins      │────── SSH ──────┐
-│  - OpenCLaw     │                  │
-│  - Docker       │                  ▼
-│                 │         ┌─────────────────┐
-│  - USB/Serial ──┼─────────│  8397 Board     │
-│  - ADB          │         │  (固定 IP)       │
-│                 │         │                 │
-└─────────────────┘         └─────────────────┘
-         │
-         │ Serial/USB
-         ▼
-┌──────────────────┐
-│ Programmable PSU │
-│ (可编程电源)      │
-│                  │
-│  - 电压控制       │
-│  - 电流监控       │
-└──────────────────┘
 ```
 
 ### 1.3 硬件环境
@@ -267,7 +242,7 @@
 - 系统服务测试
 - 所有电源模式下都可运行
 
-#### 3.2.2 测试用例类型
+#### 3.2.3 测试用例属性声明
 - **测试用例电源需求属性**
   - `Requires Power Control`: True/False（是否需要可编程电源）
   - `Power State`: ON/OFF/BOTH（需要的电源状态）
@@ -436,6 +411,34 @@
 - 通过率统计
 - AI 分析结果展示
 - 硬件状态监控
+
+## 3.4 多套自动化系统与 Jenkins 节点分配策略
+
+- **背景**: 未来可能存在多套自动化系统或多台测试服务器，不同测试任务需分配到具备相应硬件能力的 Jenkins 节点上执行。
+- **节点能力标注**: 每个 Jenkins 节点需通过标签(label)或属性声明其硬件能力，例如 `power_control:true`、`power_model:DLX-30V10AMP`、`adb:true`、`serial:true` 等。
+- **测试作业声明需求**: 测试用例或 Jenkins job 必须声明其硬件需求（例如 Robot tag `requires_power_control` 或 Jenkins 参数/标签），用于调度时匹配节点能力。
+- **调度策略**:
+  - 优先将任务调度到完全满足需求的节点。
+  - 若无可用节点，可配置为：等待（排队）、回退到能力较低的节点（降级执行）或直接跳过并在报告中记录原因。
+- **节点注册与能力检测**: 节点启动时应上报并验证可用硬件（如 `POWER_MODEL`、串口、ADB 可用性等），并自动将相应标签注册到 Jenkins 或更新 CMDB/库存。
+- **报告与审计**: 测试报告中应记录所选节点 ID/标签，以及若跳过用例要说明跳过原因（例如: "缺少可编程电源"）。
+- **兼容性要求**: 保持环境变量（如 `POWER_MODEL`）与 Jenkins 节点标签一致，以便自动过滤和分配测试用例。
+- **示例（Jenkinsfile 片段）**:
+
+```
+pipeline {
+  agent { label 'power_model_DLX-30V10AMP' }
+  stages {
+    stage('Run Tests') {
+      steps {
+        sh 'robot --include requires_power_control tests/'
+      }
+    }
+  }
+}
+```
+
+以上规则保证测试任务能根据所需硬件能力被路由到合适的 Jenkins 节点执行，减少手动干预并在报告中提供可追溯性。
 
 ## 4. 技术栈
 
@@ -674,10 +677,10 @@ SERIAL_DEVICE=/dev/ttyUSB0      # 串口设备路径
 BAUD_RATE=9600                  # 波特率：9600 或 115200
 
 # ==================== Git 平台配置 ====================
-GIT_PLATFORM=gitlab             # github 或 gitlab
-GIT_URL=https://gitlab.example.com/username/repo.git
-GIT_USER=username               # Git 用户名
-GIT_TOKEN=your_git_token        # Git Personal Access Token
+GIT_PLATFORM=github             # github 或 gitlab
+GIT_URL=https://github.com/xiaowei1912/board-test-cases.git
+GIT_USER=xiaowei1912            # Git 用户名
+GIT_TOKEN=your_github_token     # GitHub/GitLab Personal Access Token
 
 # Jenkins Git 凭证（可选，默认使用 GIT_TOKEN）
 JENKINS_GIT_USER=${GIT_USER}
@@ -757,7 +760,7 @@ docker-compose up -d
 ## 12. 仓库详细说明
 
 ### 12.1 windflex-deploy（部署脚本仓库）
-**位置**: `github.com/yourorg/windflex-deploy`
+**位置**: `github.com/xiaowei1912/windflex-deploy`
 
 **目录结构**:
 ```
@@ -803,7 +806,7 @@ windflex-deploy/
 **使用方式**:
 ```bash
 # 1. 克隆部署脚本
-git clone https://github.com/yourorg/windflex-deploy.git
+git clone https://github.com/xiaowei1912/windflex-deploy.git
 cd windflex-deploy
 
 # 2. 运行一键部署
@@ -814,7 +817,7 @@ sudo ./scripts/deploy.sh
 ```
 
 ### 12.2 windflex-system（系统代码和配置仓库）
-**位置**: `github.com/yourorg/windflex-system`
+**位置**: `github.com/xiaowei1912/windflex-system`
 
 **目录结构**:
 ```
@@ -872,7 +875,7 @@ windflex-system/
 **使用方式**:
 ```bash
 # 1. 克隆系统仓库
-git clone https://github.com/yourorg/windflex-system.git
+git clone https://github.com/xiaowei1912/windflex-system.git
 cd windflex-system
 
 # 2. 配置环境变量
@@ -887,7 +890,7 @@ docker-compose logs -f
 ```
 
 ### 12.3 test-cases（测试用例仓库 - 独立 Git Repo）
-**位置**: `github.com/yourorg/board-test-cases`
+**位置**: `github.com/xiaowei1912/board-test-cases`
 
 **目录结构**:
 ```
@@ -930,7 +933,7 @@ board-test-cases/
 **用户提交测试用例**:
 ```bash
 # 1. 克隆测试用例仓库
-git clone https://github.com/yourorg/board-test-cases.git
+git clone https://github.com/xiaowei1912/board-test-cases.git
 cd board-test-cases
 
 # 2. 创建新分支
@@ -987,6 +990,15 @@ logs/
 *.pyc
 __pycache__/
 .env
+.env.local
+
+# IDE 配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+```
 
 # IDE 配置
 .vscode/
